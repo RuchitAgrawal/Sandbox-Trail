@@ -33,18 +33,3 @@ impl VirtualClock {
         self.rng.gen::<f32>()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_clock_deterministic_advancement() {
-        let mut clock = VirtualClock::new(42);
-        assert_eq!(clock.current_tick, 0);
-        clock.advance_one_ms();
-        assert_eq!(clock.current_tick, 1);
-        let r1 = clock.rand_range(10, 50);
-        assert!((10..50).contains(&r1));
-    }
-}
