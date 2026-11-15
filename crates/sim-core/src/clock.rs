@@ -1,3 +1,4 @@
+use rand::Rng;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
@@ -19,5 +20,16 @@ impl VirtualClock {
 
     pub fn advance_one_ms(&mut self) {
         self.current_tick += 1;
+    }
+
+    pub fn rand_range(&mut self, lo: u64, hi: u64) -> u64 {
+        if lo >= hi {
+            return lo;
+        }
+        self.rng.gen_range(lo..hi)
+    }
+
+    pub fn gen_f32(&mut self) -> f32 {
+        self.rng.gen::<f32>()
     }
 }
