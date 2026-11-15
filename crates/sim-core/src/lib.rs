@@ -1,6 +1,5 @@
 pub mod clock;
+pub mod event_log;
 
 pub use clock::{Tick, VirtualClock};
-
-// Core error types and simulation result aliases
-pub type SimResult<T> = Result<T, String>;
+pub use event_log::EventLog;
