@@ -198,3 +198,29 @@ impl VirtualNetwork {
                 } else {
                     deliverable.push(pkt);
                 }
+            } else {
+                break;
+            }
+        }
+
+        deliverable
+    }
+
+    pub fn prune_visual_drops(&mut self, current_tick: Tick) {
+        self.visual_drops.retain(|d| {
+            current_tick.saturating_sub(d.dropped_at_tick) < d.display_duration_ticks
+        });
+    }
+
+    pub fn in_flight_count(&self) -> usize {
+        self.in_flight.len()
+    }
+
+    pub fn iter_in_flight(&self) -> impl Iterator<Item = &Packet> {
+        self.in_flight.iter().map(|Reverse(sp)| &sp.packet)
+    }
+
+    pub fn iter_visual_drops(&self) -> impl Iterator<Item = &VisualDrop> {
+        self.visual_drops.iter()
+    }
+}
