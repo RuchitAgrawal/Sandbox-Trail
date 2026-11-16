@@ -167,3 +167,34 @@ impl VirtualNetwork {
         } else {
             current_tick + total_latency
         };
+
+        let packet = Packet {
+            id,
+            from,
+            to,
+            sent_at: current_tick,
+            deliver_at,
+            payload,
+            dropped: will_drop,
+        };
+
+        self.in_flight.push(Reverse(ScheduledPacket { packet }));
+    }
+
+    pub fn drain_due(&mut self, current_tick: Tick) -> Vec<Packet> {
+        let mut deliverable = Vec::new();
+
+        while let Some(Reverse(scheduled)) = self.in_flight.peek() {
+            if scheduled.packet.deliver_at <= current_tick {
+                let Reverse(scheduled) = self.in_flight.pop().unwrap();
+                let pkt = scheduled.packet;
+
+                if pkt.dropped {
+                    self.visual_drops.push(VisualDrop {
+                        packet: pkt,
+                        dropped_at_tick: current_tick,
+                        display_duration_ticks: VISUAL_DROP_DURATION_MS,
+                    });
+                } else {
+                    deliverable.push(pkt);
+                }
