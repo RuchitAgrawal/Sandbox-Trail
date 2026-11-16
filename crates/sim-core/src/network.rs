@@ -98,3 +98,43 @@ impl VirtualNetwork {
     pub fn new() -> Self {
         Self {
             in_flight: BinaryHeap::new(),
+            links: HashMap::new(),
+            visual_drops: Vec::new(),
+            next_packet_id: 1,
+        }
+    }
+
+    pub fn get_link(&self, a: NodeId, b: NodeId) -> LinkConfig {
+        self.links.get(&link_key(a, b)).cloned().unwrap_or_default()
+    }
+
+    pub fn get_or_insert_link(&mut self, a: NodeId, b: NodeId) -> &mut LinkConfig {
+        self.links.entry(link_key(a, b)).or_default()
+    }
+
+    pub fn set_partition(&mut self, a: NodeId, b: NodeId, partitioned: bool) {
+        self.get_or_insert_link(a, b).partitioned = partitioned;
+    }
+
+    pub fn set_latency(&mut self, a: NodeId, b: NodeId, base_ms: u64, extra_lag_ms: u64) {
+        let link = self.get_or_insert_link(a, b);
+        link.base_latency_ms = base_ms;
+        link.extra_lag_ms = extra_lag_ms;
+    }
+
+    pub fn set_drop_rate(&mut self, a: NodeId, b: NodeId, drop_rate: f32) {
+        self.get_or_insert_link(a, b).drop_rate = drop_rate.clamp(0.0, 1.0);
+    }
+
+    pub fn heal_all(&mut self) {
+        for link in self.links.values_mut() {
+            link.partitioned = false;
+        }
+    }
+
+    pub fn all_links(&self) -> &HashMap<(NodeId, NodeId), LinkConfig> {
+        &self.links
+    }
+
+    pub fn enqueue(
+        &mut self,
