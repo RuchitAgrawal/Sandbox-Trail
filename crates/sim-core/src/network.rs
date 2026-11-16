@@ -58,3 +58,43 @@ pub struct LinkConfig {
     pub base_latency_ms: u64,
     pub jitter_ms: u64,
     pub drop_rate: f32,
+    pub extra_lag_ms: u64,
+}
+
+impl Default for LinkConfig {
+    fn default() -> Self {
+        Self {
+            partitioned: false,
+            base_latency_ms: DEFAULT_BASE_LATENCY_MS,
+            jitter_ms: DEFAULT_JITTER_MS,
+            drop_rate: 0.0,
+            extra_lag_ms: 0,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct VisualDrop {
+    pub packet: Packet,
+    pub dropped_at_tick: Tick,
+    pub display_duration_ticks: Tick,
+}
+
+#[derive(Clone, Debug)]
+pub struct VirtualNetwork {
+    in_flight: BinaryHeap<Reverse<ScheduledPacket>>,
+    links: HashMap<(NodeId, NodeId), LinkConfig>,
+    visual_drops: Vec<VisualDrop>,
+    next_packet_id: u64,
+}
+
+impl Default for VirtualNetwork {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl VirtualNetwork {
+    pub fn new() -> Self {
+        Self {
+            in_flight: BinaryHeap::new(),
