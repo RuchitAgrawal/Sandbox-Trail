@@ -138,3 +138,32 @@ impl VirtualNetwork {
 
     pub fn enqueue(
         &mut self,
+        from: NodeId,
+        to: NodeId,
+        payload: RpcPayload,
+        current_tick: Tick,
+        clock: &mut VirtualClock,
+    ) {
+        let id = self.next_packet_id;
+        self.next_packet_id += 1;
+
+        let link = self.get_link(from, to);
+
+        let jitter = if link.jitter_ms > 0 {
+            clock.rand_range(0, link.jitter_ms)
+        } else {
+            0
+        };
+
+        let total_latency = (link.base_latency_ms + link.extra_lag_ms + jitter).max(1);
+
+        let is_partitioned = link.partitioned;
+        let is_flaky_drop = !is_partitioned && link.drop_rate > 0.0 && clock.gen_f32() < link.drop_rate;
+
+        let will_drop = is_partitioned || is_flaky_drop;
+
+        let deliver_at = if will_drop {
+            current_tick + (total_latency / 2).max(1)
+        } else {
+            current_tick + total_latency
+        };
