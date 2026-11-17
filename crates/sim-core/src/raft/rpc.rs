@@ -83,3 +83,28 @@ impl RpcPayload {
         match self {
             RpcPayload::RequestVote(_) => RpcType::RequestVote,
             RpcPayload::RequestVoteReply(r) => {
+                if r.vote_granted {
+                    RpcType::VoteGranted
+                } else {
+                    RpcType::VoteDenied
+                }
+            }
+            RpcPayload::AppendEntries(a) => {
+                if a.entries.is_empty() {
+                    RpcType::Heartbeat
+                } else {
+                    RpcType::AppendEntries
+                }
+            }
+            RpcPayload::AppendEntriesReply(r) => {
+                if r.success {
+                    RpcType::AppendEntriesSuccess
+                } else {
+                    RpcType::AppendEntriesReject
+                }
+            }
+            RpcPayload::ClientWrite(_) => RpcType::ClientWrite,
+            RpcPayload::ClientWriteAck(_) => RpcType::ClientWriteAck,
+        }
+    }
+}
