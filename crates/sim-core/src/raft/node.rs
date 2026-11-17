@@ -168,3 +168,53 @@ impl RaftNode {
             self.become_leader(current_tick, outbox);
             return;
         }
+
+        let last_log_index = self.log.last_log_index();
+        let last_log_term = self.log.last_log_term();
+
+        for &peer in &self.peers {
+            outbox.push(OutgoingPacket {
+                to: peer,
+                payload: RpcPayload::RequestVote(RequestVoteArgs {
+                    term: self.current_term,
+                    candidate_id: self.id,
+                    last_log_index,
+                    last_log_term,
+                }),
+            });
+        }
+    }
+
+    pub fn become_leader(&mut self, current_tick: Tick, outbox: &mut Vec<OutgoingPacket>) {
+        self.role = Role::Leader;
+        let next_idx = self.log.last_log_index() + 1;
+        self.next_index.clear();
+        self.match_index.clear();
+        for &peer in &self.peers {
+            self.next_index.insert(peer, next_idx);
+            self.match_index.insert(peer, 0);
+        }
+
+        self.log_event(
+            current_tick,
+            format!("Elected Leader for term {}", self.current_term),
+        );
+
+        // Send initial heartbeat immediately
+        self.send_heartbeats(outbox);
+        self.ticks_since_heartbeat = 0;
+    }
+
+    pub fn send_heartbeats(&self, outbox: &mut Vec<OutgoingPacket>) {
+        for &peer in &self.peers {
+            let next = *self.next_index.get(&peer).unwrap_or(&(self.log.last_log_index() + 1));
+            let prev_log_index = next.saturating_sub(1);
+            let prev_log_term = self.log.term_at(prev_log_index).unwrap_or(0);
+            let entries = self.log.slice_from(next);
+
+            outbox.push(OutgoingPacket {
+                to: peer,
+                payload: RpcPayload::AppendEntries(AppendEntriesArgs {
+                    term: self.current_term,
+                    leader_id: self.id,
+                    prev_log_index,
