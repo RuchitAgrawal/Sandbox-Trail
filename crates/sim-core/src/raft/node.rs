@@ -268,3 +268,53 @@ impl RaftNode {
             leader_hint: Some(self.id),
             index,
         }
+    }
+
+    pub fn handle_packet(
+        &mut self,
+        from: NodeId,
+        payload: RpcPayload,
+        current_tick: Tick,
+        clock: &mut VirtualClock,
+        outbox: &mut Vec<OutgoingPacket>,
+    ) {
+        if self.is_crashed() {
+            return;
+        }
+
+        match payload {
+            RpcPayload::RequestVote(args) => self.handle_request_vote(from, args, current_tick, clock, outbox),
+            RpcPayload::RequestVoteReply(reply) => self.handle_request_vote_reply(from, reply, current_tick, outbox),
+            RpcPayload::AppendEntries(args) => self.handle_append_entries(from, args, current_tick, clock, outbox),
+            RpcPayload::AppendEntriesReply(reply) => self.handle_append_entries_reply(from, reply, current_tick),
+            RpcPayload::ClientWrite(args) => {
+                let ack = self.handle_client_write(args.command, current_tick, outbox);
+                outbox.push(OutgoingPacket {
+                    to: from,
+                    payload: RpcPayload::ClientWriteAck(ack),
+                });
+            }
+            RpcPayload::ClientWriteAck(_) => {}
+        }
+    }
+
+    fn check_term(&mut self, term: Term, current_tick: Tick, clock: &mut VirtualClock) {
+        if term > self.current_term {
+            self.current_term = term;
+            self.voted_for = None;
+            self.role = Role::Follower;
+            self.ticks_since_heartbeat = 0;
+            self.election_timeout = clock.rand_range(ELECTION_TIMEOUT_MIN, ELECTION_TIMEOUT_MAX);
+            self.log_event(
+                current_tick,
+                format!("Discovered higher term {}, stepped down to Follower", term),
+            );
+        }
+    }
+
+    fn handle_request_vote(
+        &mut self,
+        from: NodeId,
+        args: RequestVoteArgs,
+        current_tick: Tick,
+        clock: &mut VirtualClock,
