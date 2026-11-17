@@ -68,3 +68,53 @@ impl RaftNode {
             next_index: HashMap::new(),
             match_index: HashMap::new(),
             election_timeout,
+            ticks_since_heartbeat: 0,
+            peers,
+            node_log: vec![format!("Initialized as Follower (timeout: {}ms)", election_timeout)],
+        }
+    }
+
+    pub fn cluster_size(&self) -> usize {
+        self.peers.len() + 1
+    }
+
+    pub fn majority(&self) -> usize {
+        (self.cluster_size() / 2) + 1
+    }
+
+    pub fn log_event(&mut self, current_tick: Tick, msg: String) {
+        if self.node_log.len() >= 100 {
+            self.node_log.remove(0);
+        }
+        self.node_log.push(format!("[{}ms T{}] {}", current_tick, self.current_term, msg));
+    }
+
+    pub fn is_crashed(&self) -> bool {
+        matches!(self.role, Role::Crashed)
+    }
+
+    pub fn toggle_crash(&mut self, current_tick: Tick, clock: &mut VirtualClock) {
+        if self.is_crashed() {
+            // Restart: preserve persistent state (term, voted_for, log)
+            self.role = Role::Follower;
+            self.ticks_since_heartbeat = 0;
+            self.election_timeout = clock.rand_range(ELECTION_TIMEOUT_MIN, ELECTION_TIMEOUT_MAX);
+            self.next_index.clear();
+            self.match_index.clear();
+            self.log_event(current_tick, "Node restarted from crash".to_string());
+        } else {
+            self.role = Role::Crashed;
+            self.log_event(current_tick, "Node crashed".to_string());
+        }
+    }
+
+    pub fn tick(
+        &mut self,
+        dt: Tick,
+        current_tick: Tick,
+        clock: &mut VirtualClock,
+        outbox: &mut Vec<OutgoingPacket>,
+    ) {
+        if self.is_crashed() {
+            return;
+        }
