@@ -48,3 +48,38 @@ pub struct AppendEntriesArgs {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppendEntriesReply {
     pub term: Term,
+    pub success: bool,
+    pub from: NodeId,
+    pub match_index: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClientWriteArgs {
+    pub command: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClientWriteAck {
+    pub success: bool,
+    pub leader_hint: Option<NodeId>,
+    pub index: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RpcType {
+    RequestVote,
+    VoteGranted,
+    VoteDenied,
+    AppendEntries,
+    Heartbeat,
+    AppendEntriesSuccess,
+    AppendEntriesReject,
+    ClientWrite,
+    ClientWriteAck,
+}
+
+impl RpcPayload {
+    pub fn rpc_type(&self) -> RpcType {
+        match self {
+            RpcPayload::RequestVote(_) => RpcType::RequestVote,
+            RpcPayload::RequestVoteReply(r) => {
