@@ -218,3 +218,53 @@ impl RaftNode {
                     term: self.current_term,
                     leader_id: self.id,
                     prev_log_index,
+                    prev_log_term,
+                    entries,
+                    leader_commit: self.commit_index,
+                }),
+            });
+        }
+    }
+
+    pub fn handle_client_write(
+        &mut self,
+        cmd: String,
+        current_tick: Tick,
+        outbox: &mut Vec<OutgoingPacket>,
+    ) -> ClientWriteAck {
+        if self.is_crashed() {
+            return ClientWriteAck {
+                success: false,
+                leader_hint: None,
+                index: 0,
+            };
+        }
+
+        if !matches!(self.role, Role::Leader) {
+            return ClientWriteAck {
+                success: false,
+                leader_hint: None,
+                index: 0,
+            };
+        }
+
+        let index = self.log.append(self.current_term, cmd.clone());
+        self.log_event(
+            current_tick,
+            format!("Client write appended at index {}: {}", index, cmd),
+        );
+
+        // If single node cluster, commit immediately
+        if self.majority() == 1 {
+            self.commit_index = index;
+            self.log_event(current_tick, format!("Committed index {}", index));
+        } else {
+            // Trigger early replication
+            self.send_heartbeats(outbox);
+        }
+
+        ClientWriteAck {
+            success: true,
+            leader_hint: Some(self.id),
+            index,
+        }
