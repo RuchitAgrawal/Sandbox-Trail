@@ -318,3 +318,43 @@ impl RaftNode {
         args: RequestVoteArgs,
         current_tick: Tick,
         clock: &mut VirtualClock,
+        outbox: &mut Vec<OutgoingPacket>,
+    ) {
+        self.check_term(args.term, current_tick, clock);
+
+        let mut vote_granted = false;
+
+        if args.term == self.current_term {
+            let can_vote = match self.voted_for {
+                None => true,
+                Some(cand_id) => cand_id == args.candidate_id,
+            };
+
+            let candidate_log_ok = self
+                .log
+                .is_at_least_as_up_to_date(args.last_log_index, args.last_log_term);
+
+            if can_vote && candidate_log_ok {
+                vote_granted = true;
+                self.voted_for = Some(args.candidate_id);
+                self.ticks_since_heartbeat = 0; // reset election timer
+                self.log_event(
+                    current_tick,
+                    format!("Granted vote to Node {} in term {}", args.candidate_id, args.term),
+                );
+            }
+        }
+
+        outbox.push(OutgoingPacket {
+            to: from,
+            payload: RpcPayload::RequestVoteReply(RequestVoteReply {
+                term: self.current_term,
+                vote_granted,
+                from: self.id,
+            }),
+        });
+    }
+
+    fn handle_request_vote_reply(
+        &mut self,
+        from: NodeId,
