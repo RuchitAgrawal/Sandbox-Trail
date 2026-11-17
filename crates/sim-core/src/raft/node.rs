@@ -118,3 +118,53 @@ impl RaftNode {
         if self.is_crashed() {
             return;
         }
+
+        self.ticks_since_heartbeat += dt;
+
+        match &self.role {
+            Role::Follower => {
+                if self.ticks_since_heartbeat >= self.election_timeout {
+                    self.start_election(current_tick, clock, outbox);
+                }
+            }
+            Role::Candidate { .. } => {
+                if self.ticks_since_heartbeat >= self.election_timeout {
+                    self.start_election(current_tick, clock, outbox);
+                }
+            }
+            Role::Leader => {
+                if self.ticks_since_heartbeat >= HEARTBEAT_INTERVAL {
+                    self.send_heartbeats(outbox);
+                    self.ticks_since_heartbeat = 0;
+                }
+            }
+            Role::Crashed => {}
+        }
+    }
+
+    pub fn start_election(
+        &mut self,
+        current_tick: Tick,
+        clock: &mut VirtualClock,
+        outbox: &mut Vec<OutgoingPacket>,
+    ) {
+        self.current_term += 1;
+        let mut votes = HashSet::new();
+        votes.insert(self.id);
+        self.voted_for = Some(self.id);
+        self.role = Role::Candidate {
+            votes_received: votes.clone(),
+        };
+        self.ticks_since_heartbeat = 0;
+        self.election_timeout = clock.rand_range(ELECTION_TIMEOUT_MIN, ELECTION_TIMEOUT_MAX);
+
+        self.log_event(
+            current_tick,
+            format!("Election started for term {}, voted for self", self.current_term),
+        );
+
+        // Check single node cluster edge case
+        if votes.len() >= self.majority() {
+            self.become_leader(current_tick, outbox);
+            return;
+        }
