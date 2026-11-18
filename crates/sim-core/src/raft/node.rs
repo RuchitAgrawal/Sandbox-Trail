@@ -428,3 +428,33 @@ impl RaftNode {
             match append_res {
                 Ok(last_idx) => {
                     success = true;
+                    match_index = last_idx;
+
+                    if args.leader_commit > self.commit_index {
+                        let new_commit = args.leader_commit.min(match_index);
+                        if new_commit > self.commit_index {
+                            self.commit_index = new_commit;
+                            self.log_event(
+                                current_tick,
+                                format!("Advanced commitIndex to {}", self.commit_index),
+                            );
+                        }
+                    }
+                }
+                Err(()) => {
+                    success = false;
+                    match_index = self.log.last_log_index();
+                }
+            }
+        }
+
+        outbox.push(OutgoingPacket {
+            to: from,
+            payload: RpcPayload::AppendEntriesReply(AppendEntriesReply {
+                term: self.current_term,
+                success,
+                from: self.id,
+                match_index,
+            }),
+        });
+    }
