@@ -118,3 +118,28 @@ impl ReplicatedLog {
         match_indices: &HashMap<super::rpc::NodeId, u64>,
         current_term: Term,
         cluster_size: usize,
+        my_id: super::rpc::NodeId,
+    ) -> Option<u64> {
+        let last_index = self.last_log_index();
+        let majority = (cluster_size / 2) + 1;
+
+        let mut match_counts: Vec<u64> = Vec::new();
+        for index in 1..=last_index {
+            if let Some(entry) = self.get_entry(index) {
+                if entry.term == current_term {
+                    let mut count = 1; // leader itself matches
+                    for (&peer_id, &m_idx) in match_indices {
+                        if peer_id != my_id && m_idx >= index {
+                            count += 1;
+                        }
+                    }
+                    if count >= majority {
+                        match_counts.push(index);
+                    }
+                }
+            }
+        }
+
+        match_counts.into_iter().max()
+    }
+}
