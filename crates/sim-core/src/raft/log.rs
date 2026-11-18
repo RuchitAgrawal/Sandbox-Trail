@@ -83,3 +83,38 @@ impl ReplicatedLog {
         } else {
             return Err(());
         }
+
+        let mut insert_pos = (prev_log_index + 1) as usize;
+        for new_entry in new_entries {
+            if insert_pos < self.entries.len() {
+                if self.entries[insert_pos].term != new_entry.term {
+                    self.entries.truncate(insert_pos);
+                    self.entries.push(new_entry.clone());
+                }
+            } else {
+                self.entries.push(new_entry.clone());
+            }
+            insert_pos += 1;
+        }
+
+        Ok(self.last_log_index())
+    }
+
+    pub fn slice_from(&self, start_index: u64) -> Vec<LogEntry> {
+        let start = start_index as usize;
+        if start >= self.entries.len() {
+            Vec::new()
+        } else {
+            self.entries[start..].to_vec()
+        }
+    }
+
+    pub fn all_entries(&self) -> &[LogEntry] {
+        &self.entries
+    }
+
+    pub fn try_advance_commit(
+        &self,
+        match_indices: &HashMap<super::rpc::NodeId, u64>,
+        current_term: Term,
+        cluster_size: usize,
