@@ -17,4 +17,21 @@ A deterministic distributed systems simulator and chaos engineering visualizer. 
 
 ```
 +-----------------------------------------------------------------------+
-|                         BROWSER (React + Vite)                      
+|                         BROWSER (React + Vite)                        |
+|                                                                       |
+|  +-----------------------------+    +------------------------------+  |
+|  |   React UI / HUD (Zustand)  |    |   HTML5 Canvas (60fps Loop)  |  |
+|  | - Chaos Toolbar (Scissors)  |    | - Nodes, States, Timers      |  |
+|  | - Node Log Inspector        |    | - Flying Packets (RPCs)      |  |
+|  | - Time-Travel Scrubber      |    | - Partition Lines & Lag      |  |
+|  +--------------+--------------+    +--------------+---------------+  |
+|                 | Commands                         ^ Snapshot         |
+|                 v                                  | (60Hz pull)      |
++-----------------|----------------------------------|------------------+
+                  |           WASM FFI Bridge        |
+                  |   (wasm-bindgen + serde-wasm-bindgen)              |
++-----------------|----------------------------------|------------------+
+|                 v                                  |                  |
+|  +----------------------------------------------------------+        |
+|  |            SimulationController  (sim-wasm)              |        |
+|  |   - Owns SimState & Snapshot 
