@@ -458,3 +458,28 @@ impl RaftNode {
             }),
         });
     }
+
+    fn handle_append_entries_reply(
+        &mut self,
+        from: NodeId,
+        reply: AppendEntriesReply,
+        current_tick: Tick,
+    ) {
+        if reply.term > self.current_term {
+            self.current_term = reply.term;
+            self.voted_for = None;
+            self.role = Role::Follower;
+            self.ticks_since_heartbeat = 0;
+            self.log_event(
+                current_tick,
+                format!("Received AE reply with higher term {}, stepped down", reply.term),
+            );
+            return;
+        }
+
+        if !matches!(self.role, Role::Leader) || reply.term != self.current_term {
+            return;
+        }
+
+        if reply.success {
+            self.match_index.insert(from, reply.match_index);
