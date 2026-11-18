@@ -398,3 +398,33 @@ impl RaftNode {
 
             if won_election {
                 self.become_leader(current_tick, outbox);
+            }
+        }
+    }
+
+    fn handle_append_entries(
+        &mut self,
+        from: NodeId,
+        args: AppendEntriesArgs,
+        current_tick: Tick,
+        clock: &mut VirtualClock,
+        outbox: &mut Vec<OutgoingPacket>,
+    ) {
+        self.check_term(args.term, current_tick, clock);
+
+        let mut success = false;
+        let mut match_index = 0;
+
+        if args.term >= self.current_term {
+            self.role = Role::Follower;
+            self.ticks_since_heartbeat = 0; // reset timer
+
+            let append_res = self.log.append_entries_from_leader(
+                args.prev_log_index,
+                args.prev_log_term,
+                &args.entries,
+            );
+
+            match append_res {
+                Ok(last_idx) => {
+                    success = true;
