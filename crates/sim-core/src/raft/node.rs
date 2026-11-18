@@ -483,3 +483,27 @@ impl RaftNode {
 
         if reply.success {
             self.match_index.insert(from, reply.match_index);
+            self.next_index.insert(from, reply.match_index + 1);
+
+            // Check if commit_index can advance
+            if let Some(new_commit) = self.log.try_advance_commit(
+                &self.match_index,
+                self.current_term,
+                self.cluster_size(),
+                self.id,
+            ) {
+                if new_commit > self.commit_index {
+                    self.commit_index = new_commit;
+                    self.log_event(
+                        current_tick,
+                        format!("Majority match achieved: commitIndex advanced to {}", new_commit),
+                    );
+                }
+            }
+        } else {
+            // Decrement next_index and retry
+            let current_next = self.next_index.entry(from).or_insert(2);
+            *current_next = current_next.saturating_sub(1).max(1);
+        }
+    }
+}
