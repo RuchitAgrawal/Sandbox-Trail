@@ -358,3 +358,43 @@ impl RaftNode {
     fn handle_request_vote_reply(
         &mut self,
         from: NodeId,
+        reply: RequestVoteReply,
+        current_tick: Tick,
+        outbox: &mut Vec<OutgoingPacket>,
+    ) {
+        if reply.term > self.current_term {
+            self.current_term = reply.term;
+            self.voted_for = None;
+            self.role = Role::Follower;
+            self.ticks_since_heartbeat = 0;
+            self.log_event(
+                current_tick,
+                format!("Received RV reply with higher term {}, stepped down", reply.term),
+            );
+            return;
+        }
+
+        if reply.term == self.current_term {
+            let mut won_election = false;
+            let mut vote_count = 0;
+            let maj = self.majority();
+
+            if let Role::Candidate { votes_received } = &mut self.role {
+                if reply.vote_granted {
+                    votes_received.insert(from);
+                    vote_count = votes_received.len();
+                    if vote_count >= maj {
+                        won_election = true;
+                    }
+                }
+            }
+
+            if vote_count > 0 {
+                self.log_event(
+                    current_tick,
+                    format!("Vote granted by Node {} ({}/{} votes)", from, vote_count, maj),
+                );
+            }
+
+            if won_election {
+                self.become_leader(current_tick, outbox);
