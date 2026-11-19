@@ -298,3 +298,75 @@ fn test_flaky_network_tolerance() {
     for a in 0..5 {
         for b in (a + 1)..5 {
             sim.set_link_drop_rate(a, b, 0.25);
+        }
+    }
+
+    // Run for 3000ms
+    for _ in 0..3000 {
+        sim.step_one_ms();
+    }
+
+    let inv = sim.check_invariants();
+    assert!(inv.election_safety.is_ok());
+    assert!(inv.log_matching.is_ok());
+}
+
+#[test]
+fn test_election_safety_fuzz_with_active_chaos() {
+    // 50 randomized runs with active random crashes and partitions
+    for seed in 0..50u64 {
+        let mut sim = SimState::new(5, seed);
+        let mut chaos_rng = ChaCha8Rng::seed_from_u64(seed ^ 0xdeadbeef_cafebabe);
+
+        for tick in 0..3_000u64 {
+            if tick % 200 == 0 {
+                let n = 5u32;
+                match chaos_rng.gen_range(0..6) {
+                    0 => {
+                        let node = chaos_rng.gen_range(0..n);
+                        sim.toggle_crash(node);
+                    }
+                    1 => {
+                        let a = chaos_rng.gen_range(0..n);
+                        let b = chaos_rng.gen_range(0..n);
+                        if a != b {
+                            sim.set_partition(a, b, true);
+                        }
+                    }
+                    2 => {
+                        let a = chaos_rng.gen_range(0..n);
+                        let b = chaos_rng.gen_range(0..n);
+                        if a != b {
+                            sim.set_partition(a, b, false);
+                        }
+                    }
+                    3 => {
+                        let leader = sim.check_invariants().current_leader;
+                        if let Some(lid) = leader {
+                            sim.client_write(lid, format!("CMD_TICK_{}", tick));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            sim.step_one_ms();
+
+            let inv = sim.check_invariants();
+            assert!(
+                inv.election_safety.is_ok(),
+                "ElectionSafety violated at tick {} with seed {}: {:?}",
+                tick,
+                seed,
+                inv.election_safety
+            );
+            assert!(
+                inv.log_matching.is_ok(),
+                "LogMatching violated at tick {} with seed {}: {:?}",
+                tick,
+                seed,
+                inv.log_matching
+            );
+        }
+    }
+}
