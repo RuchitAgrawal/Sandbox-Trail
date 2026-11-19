@@ -58,3 +58,83 @@ fn test_leader_sends_heartbeats_preventing_new_elections() {
 #[test]
 fn test_client_write_replicated_and_committed() {
     let mut sim = SimState::new(5, 777);
+
+    // Wait for leader
+    for _ in 0..500 {
+        sim.step_one_ms();
+    }
+
+    let leader_id = sim.check_invariants().current_leader.expect("Must have leader");
+    let ack = sim.client_write(leader_id, "SET key = 100".to_string());
+    assert!(ack.success);
+    assert_eq!(ack.index, 1);
+
+    // Wait for 2 round trips (~100ms) for replication and commit
+    for _ in 0..150 {
+        sim.step_one_ms();
+    }
+
+    assert_eq!(sim.nodes[leader_id as usize].commit_index, 1);
+
+    // Check majority of followers also committed
+    let committed_count = sim.nodes.iter().filter(|n| n.commit_index >= 1).count();
+    assert!(committed_count >= 3, "Majority must commit the entry");
+}
+
+#[test]
+fn test_client_write_rejected_by_follower() {
+    let mut sim = SimState::new(5, 999);
+
+    for _ in 0..500 {
+        sim.step_one_ms();
+    }
+
+    let leader_id = sim.check_invariants().current_leader.expect("Leader exists");
+    let follower_id = (0..5).find(|&id| id != leader_id).unwrap();
+
+    let ack = sim.client_write(follower_id, "SET x = 1".to_string());
+    assert!(!ack.success, "Follower must reject client write");
+}
+
+#[test]
+fn test_leader_crash_triggers_reelection() {
+    let mut sim = SimState::new(5, 101);
+
+    // Wait for initial election
+    for _ in 0..500 {
+        sim.step_one_ms();
+    }
+
+    let first_leader = sim.check_invariants().current_leader.expect("Leader exists");
+    let first_term = sim.nodes[first_leader as usize].current_term;
+
+    // Crash the leader
+    sim.toggle_crash(first_leader);
+    assert!(sim.nodes[first_leader as usize].is_crashed());
+
+    // Advance 600ms for follower timeout and re-election
+    for _ in 0..600 {
+        sim.step_one_ms();
+    }
+
+    let inv = sim.check_invariants();
+    assert!(inv.election_safety.is_ok());
+    let new_leader = inv.current_leader.expect("New leader must be elected");
+    assert_ne!(new_leader, first_leader);
+    assert!(sim.nodes[new_leader as usize].current_term > first_term);
+}
+
+#[test]
+fn test_crashed_node_restart_preserves_term_and_log() {
+    let mut sim = SimState::new(5, 202);
+
+    for _ in 0..500 {
+        sim.step_one_ms();
+    }
+
+    let leader_id = sim.check_invariants().current_leader.unwrap();
+    sim.client_write(leader_id, "SET val = 42".to_string());
+
+    for _ in 0..150 {
+        sim.step_one_ms();
+    }
