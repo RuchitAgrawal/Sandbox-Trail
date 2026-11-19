@@ -38,3 +38,55 @@ pub struct PacketSnapshot {
     pub sent_at: Tick,
     pub deliver_at: Tick,
     pub progress: f32, // 0.0 to 1.0
+    pub rpc_type: RpcType,
+    pub summary: String,
+    pub dropped: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LinkSnapshot {
+    pub a: NodeId,
+    pub b: NodeId,
+    pub partitioned: bool,
+    pub base_latency_ms: u64,
+    pub jitter_ms: u64,
+    pub drop_rate: f32,
+    pub extra_lag_ms: u64,
+}
+
+impl SimSnapshot {
+    pub fn create_node_snapshot(node: &RaftNode) -> NodeSnapshot {
+        let role_str = match &node.role {
+            crate::raft::Role::Leader => "Leader",
+            crate::raft::Role::Candidate { .. } => "Candidate",
+            crate::raft::Role::Follower => "Follower",
+            crate::raft::Role::Crashed => "Crashed",
+        };
+
+        let election_progress = if node.is_crashed() || matches!(node.role, crate::raft::Role::Leader) {
+            0.0
+        } else {
+            (node.ticks_since_heartbeat as f32 / node.election_timeout as f32).clamp(0.0, 1.0)
+        };
+
+        let heartbeat_progress = if matches!(node.role, crate::raft::Role::Leader) {
+            (node.ticks_since_heartbeat as f32 / HEARTBEAT_INTERVAL as f32).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+
+        NodeSnapshot {
+            id: node.id,
+            role: role_str.to_string(),
+            current_term: node.current_term,
+            voted_for: node.voted_for,
+            commit_index: node.commit_index,
+            last_applied: node.last_applied,
+            log_length: node.log.last_log_index(),
+            log_entries: node.log.all_entries().to_vec(),
+            election_timeout_progress: election_progress,
+            heartbeat_progress,
+            node_log: node.node_log.clone(),
+        }
+    }
+}
