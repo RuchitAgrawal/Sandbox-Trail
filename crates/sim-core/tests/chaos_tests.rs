@@ -138,3 +138,83 @@ fn test_crashed_node_restart_preserves_term_and_log() {
     for _ in 0..150 {
         sim.step_one_ms();
     }
+
+    let follower = (0..5).find(|&id| id != leader_id).unwrap();
+    let term_before = sim.nodes[follower as usize].current_term;
+    let log_len_before = sim.nodes[follower as usize].log.last_log_index();
+
+    // Crash and restart
+    sim.toggle_crash(follower);
+    assert!(sim.nodes[follower as usize].is_crashed());
+
+    sim.toggle_crash(follower);
+    assert!(!sim.nodes[follower as usize].is_crashed());
+
+    // Persistent state preserved
+    assert_eq!(sim.nodes[follower as usize].current_term, term_before);
+    assert_eq!(sim.nodes[follower as usize].log.last_log_index(), log_len_before);
+    assert_eq!(sim.nodes[follower as usize].role, Role::Follower);
+}
+
+#[test]
+fn test_network_partition_minority_cannot_commit() {
+    let mut sim = SimState::new(5, 303);
+
+    for _ in 0..500 {
+        sim.step_one_ms();
+    }
+
+    // Partition nodes {0, 1} from {2, 3, 4}
+    let minority = [0, 1];
+    let majority = [2, 3, 4];
+
+    for &a in &minority {
+        for &b in &majority {
+            sim.set_partition(a, b, true);
+        }
+    }
+
+    // Give cluster 500ms to stabilize partition
+    for _ in 0..500 {
+        sim.step_one_ms();
+    }
+
+    // The majority {2, 3, 4} should have an active leader
+    let majority_leaders: Vec<_> = majority
+        .iter()
+        .filter(|&&id| matches!(sim.nodes[id as usize].role, Role::Leader))
+        .collect();
+    assert_eq!(majority_leaders.len(), 1, "Majority partition must elect a leader");
+
+    // The minority {0, 1} cannot commit any writes because quorum is 3
+    for &m in &minority {
+        if matches!(sim.nodes[m as usize].role, Role::Leader) {
+            sim.client_write(m, "SET minority = true".to_string());
+            for _ in 0..300 {
+                sim.step_one_ms();
+            }
+            assert_eq!(
+                sim.nodes[m as usize].commit_index, 0,
+                "Minority leader must never commit without majority quorum"
+            );
+        }
+    }
+
+    // Safety checks hold
+    let inv = sim.check_invariants();
+    assert!(inv.election_safety.is_ok());
+}
+
+#[test]
+fn test_network_partition_majority_can_commit_and_heal_reconciles() {
+    let mut sim = SimState::new(5, 404);
+
+    for _ in 0..500 {
+        sim.step_one_ms();
+    }
+
+    let minority = [0, 1];
+    let majority = [2, 3, 4];
+
+    for &a in &minority {
+        for &b in &majority {
