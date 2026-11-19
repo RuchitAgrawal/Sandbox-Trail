@@ -34,4 +34,15 @@ A deterministic distributed systems simulator and chaos engineering visualizer. 
 |                 v                                  |                  |
 |  +----------------------------------------------------------+        |
 |  |            SimulationController  (sim-wasm)              |        |
-|  |   - Owns SimState & Snapshot 
+|  |   - Owns SimState & Snapshot Ring Buffer                 |        |
+|  |   - Serializes state snapshots to JS via serde           |        |
+|  +----------------------------------------------------------+        |
+|  |            sim-core  (Pure Rust Engine)                  |        |
+|  |                                                          |        |
+|  |  VirtualClock ──► VirtualNetwork ──► RaftNodes[]        |        |
+|  |   (1ms Ticks,     (BinaryHeap,        (State Machines,   |        |
+|  |   ChaCha8Rng)      Chaos Matrix)       Replicated Log)   |        |
+|  |                                                          |        |
+|  |  InvariantChecker ──► EventLog ──► SnapshotRingBuffer   |        |
+|  +----------------------------------------------------------+        |
++--------------------------------
