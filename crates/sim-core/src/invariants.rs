@@ -68,3 +68,48 @@ pub fn check_election_safety(nodes: &[RaftNode]) -> CheckResult {
     for (&term, leaders) in &leaders_by_term {
         if leaders.len() > 1 {
             return CheckResult::Violated {
+                description: format!(
+                    "Election Safety Violated: Multiple leaders detected in term {}: {:?}",
+                    term, leaders
+                ),
+            };
+        }
+    }
+
+    CheckResult::Ok
+}
+
+pub fn check_log_matching(nodes: &[RaftNode]) -> CheckResult {
+    // If two nodes both have an entry at index i with term t, their logs
+    // must match on all entries from 1 up to i.
+    for i in 0..nodes.len() {
+        for j in (i + 1)..nodes.len() {
+            let log_a = &nodes[i].log;
+            let log_b = &nodes[j].log;
+
+            let min_len = log_a.all_entries().len().min(log_b.all_entries().len());
+            for idx in 1..min_len {
+                let entry_a = &log_a.all_entries()[idx];
+                let entry_b = &log_b.all_entries()[idx];
+
+                if entry_a.term == entry_b.term {
+                    // Check all previous entries
+                    for prev_idx in 1..=idx {
+                        let prev_a = &log_a.all_entries()[prev_idx];
+                        let prev_b = &log_b.all_entries()[prev_idx];
+                        if prev_a != prev_b {
+                            return CheckResult::Violated {
+                                description: format!(
+                                    "Log Matching Violated: Divergence at index {} between Node {} and Node {} despite matching term at index {}",
+                                    prev_idx, nodes[i].id, nodes[j].id, idx
+                                ),
+                            };
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    CheckResult::Ok
+}
