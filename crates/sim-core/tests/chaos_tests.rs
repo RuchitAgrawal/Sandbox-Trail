@@ -218,3 +218,83 @@ fn test_network_partition_majority_can_commit_and_heal_reconciles() {
 
     for &a in &minority {
         for &b in &majority {
+            sim.set_partition(a, b, true);
+        }
+    }
+
+    for _ in 0..600 {
+        sim.step_one_ms();
+    }
+
+    let maj_leader = *majority
+        .iter()
+        .find(|&&id| matches!(sim.nodes[id as usize].role, Role::Leader))
+        .expect("Majority must have leader");
+
+    let ack = sim.client_write(maj_leader, "SET x = 99".to_string());
+    assert!(ack.success);
+
+    // Replicate within majority
+    for _ in 0..200 {
+        sim.step_one_ms();
+    }
+
+    assert!(sim.nodes[maj_leader as usize].commit_index >= 1);
+
+    // Now heal the partition
+    for &a in &minority {
+        for &b in &majority {
+            sim.set_partition(a, b, false);
+        }
+    }
+
+    // Advance 1500ms for term step-down, re-election of up-to-date node, and reconciliation
+    for _ in 0..1500 {
+        sim.step_one_ms();
+    }
+
+    let inv = sim.check_invariants();
+    assert!(inv.election_safety.is_ok());
+    assert!(inv.log_matching.is_ok());
+
+    let leader = inv.current_leader.expect("Cluster must have a leader after healing");
+
+    // Minority nodes should have caught up to the committed entry
+    for &id in &minority {
+        assert_eq!(
+            sim.nodes[id as usize].commit_index,
+            sim.nodes[leader as usize].commit_index
+        );
+    }
+}
+
+#[test]
+fn test_determinism_same_seed_produces_identical_state() {
+    let mut sim1 = SimState::new(5, 55555);
+    let mut sim2 = SimState::new(5, 55555);
+
+    for _ in 0..2000 {
+        sim1.step_one_ms();
+        sim2.step_one_ms();
+    }
+
+    let snap1 = sim1.take_snapshot();
+    let snap2 = sim2.take_snapshot();
+
+    assert_eq!(snap1.tick, snap2.tick);
+    for i in 0..5 {
+        assert_eq!(snap1.nodes[i].role, snap2.nodes[i].role);
+        assert_eq!(snap1.nodes[i].current_term, snap2.nodes[i].current_term);
+        assert_eq!(snap1.nodes[i].commit_index, snap2.nodes[i].commit_index);
+        assert_eq!(snap1.nodes[i].log_entries, snap2.nodes[i].log_entries);
+    }
+}
+
+#[test]
+fn test_flaky_network_tolerance() {
+    let mut sim = SimState::new(5, 8888);
+
+    // Set 25% drop rate on all links
+    for a in 0..5 {
+        for b in (a + 1)..5 {
+            sim.set_link_drop_rate(a, b, 0.25);
