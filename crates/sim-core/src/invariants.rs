@@ -33,3 +33,38 @@ pub fn check_invariants(nodes: &[RaftNode]) -> InvariantStatus {
     let log_matching = check_log_matching(nodes);
 
     let mut current_leader = None;
+    let mut leader_term = None;
+
+    for node in nodes {
+        if matches!(node.role, Role::Leader) {
+            current_leader = Some(node.id);
+            leader_term = Some(node.current_term);
+            break;
+        }
+    }
+
+    InvariantStatus {
+        election_safety,
+        log_matching,
+        leader_acknowledged: current_leader.is_some(),
+        current_leader,
+        leader_term,
+    }
+}
+
+pub fn check_election_safety(nodes: &[RaftNode]) -> CheckResult {
+    // Group active leaders by term. There must be <= 1 leader per term.
+    let mut leaders_by_term: HashMap<Term, Vec<NodeId>> = HashMap::new();
+
+    for node in nodes {
+        if matches!(node.role, Role::Leader) {
+            leaders_by_term
+                .entry(node.current_term)
+                .or_default()
+                .push(node.id);
+        }
+    }
+
+    for (&term, leaders) in &leaders_by_term {
+        if leaders.len() > 1 {
+            return CheckResult::Violated {
