@@ -198,3 +198,53 @@ impl SimState {
                 progress,
                 rpc_type,
                 summary,
+                dropped: pkt.dropped,
+            });
+        }
+
+        // 2. Recently dropped packets kept for visual impact
+        for drop in self.network.iter_visual_drops() {
+            let rpc_type = drop.packet.payload.rpc_type();
+            let summary = format!("{:?}", rpc_type);
+
+            in_flight_packets.push(PacketSnapshot {
+                id: drop.packet.id,
+                from: drop.packet.from,
+                to: drop.packet.to,
+                sent_at: drop.packet.sent_at,
+                deliver_at: drop.packet.deliver_at,
+                progress: 0.5, // render at the partition wall boundary
+                rpc_type,
+                summary,
+                dropped: true,
+            });
+        }
+
+        // 3. Topology links
+        let node_count = self.nodes.len() as u32;
+        let mut links = Vec::new();
+        for a in 0..node_count {
+            for b in (a + 1)..node_count {
+                let cfg = self.network.get_link(a, b);
+                links.push(LinkSnapshot {
+                    a,
+                    b,
+                    partitioned: cfg.partitioned,
+                    base_latency_ms: cfg.base_latency_ms,
+                    jitter_ms: cfg.jitter_ms,
+                    drop_rate: cfg.drop_rate,
+                    extra_lag_ms: cfg.extra_lag_ms,
+                });
+            }
+        }
+
+        SimSnapshot {
+            tick: current_tick,
+            nodes,
+            in_flight_packets,
+            links,
+            invariant_status: self.check_invariants(),
+            global_event_log: self.global_event_log.clone(),
+        }
+    }
+}

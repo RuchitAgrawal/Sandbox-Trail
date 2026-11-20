@@ -4,6 +4,7 @@ pub mod event_log;
 pub mod invariants;
 pub mod network;
 pub mod raft;
+pub mod sim;
 pub mod snapshot;
 
 pub use chaos::ChaosAction;
@@ -13,4 +14,5 @@ pub use invariants::{check_election_safety, check_invariants, check_log_matching
 pub use network::{LinkConfig, Packet, VirtualNetwork};
 pub use raft::rpc::{ClientWriteAck, LogEntry, NodeId, RequestVoteArgs, RequestVoteReply, RpcPayload, RpcType, Term};
 pub use raft::{RaftNode, ReplicatedLog, Role};
+pub use sim::SimState;
 pub use snapshot::{LinkSnapshot, NodeSnapshot, PacketSnapshot, SimSnapshot};
