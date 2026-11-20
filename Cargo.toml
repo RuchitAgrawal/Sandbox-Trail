@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/sim-core",
+    "crates/sim-wasm",
 ]
 
 [workspace.package]
@@ -9,6 +10,3 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Ruchit Agrawal <rragrawal16@gmail.com>"]
 license = "MIT OR Apache-2.0"
-
-
-
