@@ -148,3 +148,53 @@ impl SimState {
 
     pub fn set_link_drop_rate(&mut self, a: NodeId, b: NodeId, drop_rate: f32) {
         self.network.set_drop_rate(a, b, drop_rate);
+    }
+
+    pub fn toggle_crash(&mut self, node_id: NodeId) {
+        let current_tick = self.clock.current_tick;
+        if let Some(node) = self.nodes.iter_mut().find(|n| n.id == node_id) {
+            node.toggle_crash(current_tick, &mut self.clock);
+            let state = if node.is_crashed() { "crashed" } else { "restarted" };
+            self.log_event(format!("Node {} was {}", node_id, state));
+        }
+    }
+
+    pub fn apply_chaos(&mut self, action: &ChaosAction) {
+        let current_tick = self.clock.current_tick;
+        crate::chaos::apply_action(
+            action,
+            &mut self.network,
+            &mut self.nodes,
+            current_tick,
+            &mut self.clock,
+        );
+    }
+
+    pub fn check_invariants(&self) -> InvariantStatus {
+        invariants::check_invariants(&self.nodes)
+    }
+
+    pub fn take_snapshot(&self) -> SimSnapshot {
+        let current_tick = self.clock.current_tick;
+        let nodes: Vec<NodeSnapshot> = self.nodes.iter().map(SimSnapshot::create_node_snapshot).collect();
+
+        let mut in_flight_packets: Vec<PacketSnapshot> = Vec::new();
+
+        // 1. Packets actively in-flight
+        for pkt in self.network.iter_in_flight() {
+            let duration = (pkt.deliver_at.saturating_sub(pkt.sent_at)).max(1);
+            let elapsed = current_tick.saturating_sub(pkt.sent_at);
+            let progress = (elapsed as f32 / duration as f32).clamp(0.0, 1.0);
+
+            let rpc_type = pkt.payload.rpc_type();
+            let summary = format!("{:?}", rpc_type);
+
+            in_flight_packets.push(PacketSnapshot {
+                id: pkt.id,
+                from: pkt.from,
+                to: pkt.to,
+                sent_at: pkt.sent_at,
+                deliver_at: pkt.deliver_at,
+                progress,
+                rpc_type,
+                summary,
