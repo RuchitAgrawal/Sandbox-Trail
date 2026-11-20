@@ -98,3 +98,53 @@ impl SimState {
             self.step_one_ms();
         }
     }
+
+    pub fn client_write(&mut self, node_id: NodeId, cmd: String) -> ClientWriteAck {
+        let current_tick = self.clock.current_tick;
+        let mut outbox = Vec::new();
+
+        let ack = if let Some(node) = self.nodes.iter_mut().find(|n| n.id == node_id) {
+            let ack = node.handle_client_write(cmd.clone(), current_tick, &mut outbox);
+            if ack.success {
+                self.log_event(format!(
+                    "Client write '{}' accepted by Leader {} at index {}",
+                    cmd, node_id, ack.index
+                ));
+            } else {
+                self.log_event(format!(
+                    "Client write '{}' rejected by Node {} (not leader)",
+                    cmd, node_id
+                ));
+            }
+            ack
+        } else {
+            ClientWriteAck {
+                success: false,
+                leader_hint: None,
+                index: 0,
+            }
+        };
+
+        for out in outbox {
+            self.network
+                .enqueue(node_id, out.to, out.payload, current_tick, &mut self.clock);
+        }
+
+        ack
+    }
+
+    pub fn set_partition(&mut self, a: NodeId, b: NodeId, partitioned: bool) {
+        self.network.set_partition(a, b, partitioned);
+        if partitioned {
+            self.log_event(format!("Network partition cut between Node {} and Node {}", a, b));
+        } else {
+            self.log_event(format!("Network partition healed between Node {} and Node {}", a, b));
+        }
+    }
+
+    pub fn set_link_latency(&mut self, a: NodeId, b: NodeId, base_ms: u64, extra_lag_ms: u64) {
+        self.network.set_latency(a, b, base_ms, extra_lag_ms);
+    }
+
+    pub fn set_link_drop_rate(&mut self, a: NodeId, b: NodeId, drop_rate: f32) {
+        self.network.set_drop_rate(a, b, drop_rate);
