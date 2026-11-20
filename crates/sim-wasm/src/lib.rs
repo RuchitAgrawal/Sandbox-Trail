@@ -133,3 +133,45 @@ impl SimulationController {
         self.event_log.record(
             self.state.clock.current_tick,
             ChaosAction::SetLinkLatency {
+                a,
+                b,
+                base_ms,
+                extra_lag_ms,
+            },
+        );
+        self.state.set_link_latency(a, b, base_ms, extra_lag_ms);
+    }
+
+    pub fn set_link_drop_rate(&mut self, a: u32, b: u32, rate: f32) {
+        self.event_log.record(
+            self.state.clock.current_tick,
+            ChaosAction::SetLinkDropRate {
+                a,
+                b,
+                drop_rate: rate,
+            },
+        );
+        self.state.set_link_drop_rate(a, b, rate);
+    }
+
+    pub fn toggle_crash(&mut self, node_id: u32) {
+        self.event_log.record(
+            self.state.clock.current_tick,
+            ChaosAction::ToggleCrash { node: node_id },
+        );
+        self.state.toggle_crash(node_id);
+    }
+
+    pub fn heal_all(&mut self) {
+        self.event_log.record(
+            self.state.clock.current_tick,
+            ChaosAction::HealAllPartitions,
+        );
+        self.state.apply_chaos(&ChaosAction::HealAllPartitions);
+    }
+
+    pub fn export_replay(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&self.event_log)
+            .map_err(|e| JsValue::from_str(&format!("Failed to export replay: {}", e)))
+    }
+}
