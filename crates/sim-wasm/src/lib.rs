@@ -88,3 +88,48 @@ impl SimulationController {
     pub fn get_snapshot(&self) -> Result<JsValue, JsValue> {
         let snap = self.state.take_snapshot();
         serde_wasm_bindgen::to_value(&snap)
+            .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+    }
+
+    pub fn get_snapshot_at(&self, ring_index: u32) -> Result<JsValue, JsValue> {
+        if let Some(snap) = self.ring_buffer.get(ring_index as usize) {
+            serde_wasm_bindgen::to_value(snap)
+                .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+        } else {
+            Err(JsValue::from_str("Snapshot index out of bounds"))
+        }
+    }
+
+    pub fn get_ring_buffer_len(&self) -> u32 {
+        self.ring_buffer.len() as u32
+    }
+
+    pub fn client_write(&mut self, node_id: u32, cmd: String) -> Result<JsValue, JsValue> {
+        let ack = self.state.client_write(node_id, cmd.clone());
+        self.event_log.record(
+            self.state.clock.current_tick,
+            ChaosAction::ClientWrite {
+                node: node_id,
+                cmd,
+            },
+        );
+        serde_wasm_bindgen::to_value(&ack)
+            .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+    }
+
+    pub fn set_partition(&mut self, a: u32, b: u32, cut: bool) {
+        self.event_log.record(
+            self.state.clock.current_tick,
+            ChaosAction::SetPartition {
+                a,
+                b,
+                partitioned: cut,
+            },
+        );
+        self.state.set_partition(a, b, cut);
+    }
+
+    pub fn set_link_latency(&mut self, a: u32, b: u32, base_ms: u64, extra_lag_ms: u64) {
+        self.event_log.record(
+            self.state.clock.current_tick,
+            ChaosAction::SetLinkLatency {
