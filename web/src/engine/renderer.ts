@@ -348,3 +348,38 @@ function drawNodeText(
   ctx.font = '500 10px Geist Mono, monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  ctx.fillText(`T${node.current_term}`, cx, cy - 14);
+
+  // Center: Node ID + Role Icon
+  ctx.fillStyle = node.role === 'Crashed' ? '#ef4444' : '#f7f8f8';
+  ctx.font = '600 14px Geist Sans, sans-serif';
+  ctx.fillText(`N${node.id}`, cx, cy);
+
+  // Bottom: Commit Index
+  ctx.fillStyle = '#10b981';
+  ctx.font = '500 9px Geist Mono, monospace';
+  ctx.fillText(`C:${node.commit_index}`, cx, cy + 14);
+}
+
+function drawScissorPreview(
+  ctx: CanvasRenderingContext2D,
+  start: Point,
+  end: Point
+) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(start.x, start.y);
+  ctx.lineTo(end.x, end.y);
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 5]);
+  ctx.stroke();
+
+  // Cut marker at cursor
+  ctx.beginPath();
+  ctx.arc(end.x, end.y, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#ef4444';
+  ctx.fill();
+
+  ctx.restore();
+}
