@@ -98,3 +98,62 @@ function drawLinks(
 
     if (link.partitioned) {
       // Partitioned link: Red dashed line with scissor cut mark
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = isSelected ? 3 : 2;
+      ctx.setLineDash([6, 6]);
+      ctx.stroke();
+
+      // Draw cut symbol at midpoint
+      const mx = (na.x + nb.x) / 2;
+      const my = (na.y + nb.y) / 2;
+      drawCutSymbol(ctx, mx, my);
+    } else {
+      // Normal or customized link
+      if (link.extra_lag_ms > 0) {
+        ctx.strokeStyle = '#f59e0b'; // Amber for high lag
+        ctx.setLineDash([4, 4]);
+      } else if (link.drop_rate > 0) {
+        ctx.strokeStyle = '#f87171'; // Red-tinted for flaky loss
+        ctx.setLineDash([2, 2]);
+      } else {
+        ctx.strokeStyle = isSelected ? '#5e6ad2' : '#23252a';
+        ctx.setLineDash([]);
+      }
+      ctx.lineWidth = isSelected ? 2.5 : 1.5;
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+}
+
+function drawCutSymbol(ctx: CanvasRenderingContext2D, x: number, y: number) {
+  ctx.save();
+  ctx.fillStyle = '#0d0e11';
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 1.5;
+
+  ctx.beginPath();
+  ctx.arc(x, y, 9, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Small red 'X'
+  ctx.beginPath();
+  ctx.moveTo(x - 4, y - 4);
+  ctx.lineTo(x + 4, y + 4);
+  ctx.moveTo(x + 4, y - 4);
+  ctx.lineTo(x - 4, y + 4);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawPackets(
+  ctx: CanvasRenderingContext2D,
+  packets: PacketSnapshot[],
+  nodeMap: Map<number, NodeLayout>
+) {
+  for (const pkt of packets) {
+    const na = nodeMap.get(pkt.from);
+    const nb = nodeMap.get(pkt.to);
+    if (!na || !nb) continue;
