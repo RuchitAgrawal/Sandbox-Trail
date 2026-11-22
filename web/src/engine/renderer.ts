@@ -208,3 +208,53 @@ function drawPacketDot(
   ctx.fillStyle = color;
   ctx.shadowColor = color;
   ctx.shadowBlur = 6;
+
+  ctx.beginPath();
+  ctx.arc(x, y, 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.shadowBlur = 0;
+
+  // Inner dot
+  ctx.fillStyle = '#010102';
+  ctx.beginPath();
+  ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Small pill label next to packet
+  ctx.fillStyle = color;
+  ctx.font = '500 9px Geist Mono, monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x + 8, y);
+
+  ctx.restore();
+}
+
+function drawNodes(
+  ctx: CanvasRenderingContext2D,
+  nodes: NodeSnapshot[],
+  nodeMap: Map<number, NodeLayout>,
+  options: RenderOptions
+) {
+  const nodeRadius = 32;
+
+  for (const node of nodes) {
+    const pos = nodeMap.get(node.id);
+    if (!pos) continue;
+
+    const isSelected = options.selectedNodeId === node.id;
+    const isHovered = options.hoveredNodeId === node.id;
+
+    ctx.save();
+
+    // 1. Outer Progress Ring (Election timer or Leader Heartbeat)
+    drawTimerRing(ctx, pos.x, pos.y, nodeRadius, node);
+
+    // 2. Node Background Circle
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, nodeRadius, 0, Math.PI * 2);
+
+    if (node.role === 'Leader') {
+      ctx.fillStyle = '#0d1d17';
+      ctx.strokeStyle = isSelected ? '#34d399' : '#10b981';
