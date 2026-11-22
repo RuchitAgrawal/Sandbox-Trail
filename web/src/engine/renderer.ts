@@ -308,3 +308,43 @@ function drawTimerRing(
 
   // Background ring track
   ctx.beginPath();
+  ctx.arc(cx, cy, ringRadius, 0, Math.PI * 2);
+  ctx.strokeStyle = '#16181d';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  if (node.role === 'Leader') {
+    // Green heartbeat pulse
+    const progress = node.heartbeat_progress;
+    const endAngle = startAngle + 2 * Math.PI * progress;
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, ringRadius, startAngle, endAngle);
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  } else if (node.role !== 'Crashed') {
+    // Follower/Candidate election timeout progress
+    const progress = node.election_timeout_progress;
+    const endAngle = startAngle + 2 * Math.PI * progress;
+    const color = progress > 0.8 ? '#f59e0b' : '#334155';
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, ringRadius, startAngle, endAngle);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+}
+
+function drawNodeText(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  node: NodeSnapshot
+) {
+  // Top: Term
+  ctx.fillStyle = '#8a8f98';
+  ctx.font = '500 10px Geist Mono, monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
