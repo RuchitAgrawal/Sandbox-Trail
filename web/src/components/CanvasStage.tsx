@@ -178,3 +178,64 @@ export const CanvasStage: React.FC = () => {
       setCustomNodePosition(draggingNode.id, coords);
       if (dist > 4) {
         setDraggingNode((prev) => (prev ? { ...prev, hasMoved: true } : null));
+      }
+    } else if (scissorLine) {
+      setScissorLine((prev) => (prev ? { ...prev, end: coords } : null));
+    }
+  };
+
+  const handleMouseUp = () => {
+    if (draggingNode) {
+      if (!draggingNode.hasMoved) {
+        // Pure click without movement -> Select Node
+        setSelectedNodeId(draggingNode.id);
+        setSelectedLink(null);
+      }
+      setDraggingNode(null);
+    }
+
+    if (scissorLine) {
+      const snap = getLatestSnapshot();
+      if (snap) {
+        const intersected = findIntersectedLinks(
+          scissorLine.start,
+          scissorLine.end,
+          snap.links,
+          layoutRef.current
+        );
+
+        for (const link of intersected) {
+          const currentLink = snap.links.find(
+            (l) =>
+              (l.a === link.a && l.b === link.b) || (l.a === link.b && l.b === link.a)
+          );
+          if (currentLink) {
+            setPartition(link.a, link.b, !currentLink.partitioned);
+          }
+        }
+      }
+      setScissorLine(null);
+    }
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className={`relative flex-1 w-full h-full overflow-hidden ${
+        tool === 'scissor'
+          ? 'cursor-crosshair'
+          : tool === 'crash'
+          ? 'cursor-not-allowed'
+          : 'cursor-default'
+      }`}
+    >
+      <canvas
+        ref={canvasRef}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        className="block w-full h-full"
+      />
+    </div>
+  );
+};
