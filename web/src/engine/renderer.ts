@@ -157,3 +157,54 @@ function drawPackets(
     const na = nodeMap.get(pkt.from);
     const nb = nodeMap.get(pkt.to);
     if (!na || !nb) continue;
+
+    // Linear interpolation
+    const progress = Math.max(0, Math.min(1, pkt.progress));
+    const x = na.x + progress * (nb.x - na.x);
+    const y = na.y + progress * (nb.y - na.y);
+
+    if (pkt.dropped) {
+      // Render dropped burst animation
+      drawDropBurst(ctx, x, y);
+    } else {
+      drawPacketDot(ctx, x, y, pkt.rpc_type);
+    }
+  }
+}
+
+function drawDropBurst(ctx: CanvasRenderingContext2D, x: number, y: number) {
+  ctx.save();
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 2;
+
+  // Red burst explosion
+  ctx.beginPath();
+  ctx.moveTo(x - 5, y - 5);
+  ctx.lineTo(x + 5, y + 5);
+  ctx.moveTo(x + 5, y - 5);
+  ctx.lineTo(x - 5, y + 5);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(x, y, 7, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawPacketDot(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  rpcType: RpcType
+) {
+  const color = RPC_COLORS[rpcType] || '#f7f8f8';
+  const label = RPC_SHORT_LABELS[rpcType] || '';
+
+  ctx.save();
+
+  // Outer glow halo
+  ctx.fillStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 6;
