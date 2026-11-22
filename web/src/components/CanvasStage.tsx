@@ -118,3 +118,63 @@ export const CanvasStage: React.FC = () => {
   }, [paused, speed, scrubbing, selectedNodeId, selectedLink, hoveredNodeId, scissorLine, clusterSize]);
 
   // Canvas Mouse Coordinates Helper
+  const getCanvasCoords = (e: React.MouseEvent<HTMLCanvasElement>): Point => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const coords = getCanvasCoords(e);
+    const hitNode = findNodeAt(coords.x, coords.y, layoutRef.current);
+
+    if (tool === 'pointer') {
+      if (hitNode !== null) {
+        setDraggingNode({
+          id: hitNode,
+          startX: coords.x,
+          startY: coords.y,
+          hasMoved: false,
+        });
+      } else {
+        const snap = getLatestSnapshot();
+        if (snap) {
+          const hitLink = findLinkNear(coords.x, coords.y, snap.links, layoutRef.current);
+          setSelectedLink(hitLink);
+          if (!hitLink) {
+            setSelectedNodeId(null);
+          }
+        }
+      }
+    } else if (tool === 'scissor') {
+      setScissorLine({
+        start: coords,
+        end: coords,
+      });
+    } else if (tool === 'crash') {
+      if (hitNode !== null) {
+        toggleCrash(hitNode);
+      }
+    } else if (tool === 'write') {
+      if (hitNode !== null) {
+        setSelectedNodeId(hitNode);
+      }
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const coords = getCanvasCoords(e);
+
+    // Update hovered node
+    const hit = findNodeAt(coords.x, coords.y, layoutRef.current);
+    setHoveredNodeId(hit);
+
+    if (draggingNode) {
+      const dist = Math.hypot(coords.x - draggingNode.startX, coords.y - draggingNode.startY);
+      setCustomNodePosition(draggingNode.id, coords);
+      if (dist > 4) {
+        setDraggingNode((prev) => (prev ? { ...prev, hasMoved: true } : null));
