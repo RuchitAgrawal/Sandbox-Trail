@@ -258,3 +258,53 @@ function drawNodes(
     if (node.role === 'Leader') {
       ctx.fillStyle = '#0d1d17';
       ctx.strokeStyle = isSelected ? '#34d399' : '#10b981';
+      ctx.lineWidth = isSelected ? 3 : 2;
+    } else if (node.role === 'Candidate') {
+      ctx.fillStyle = '#1c1508';
+      ctx.strokeStyle = isSelected ? '#fbbf24' : '#f59e0b';
+      ctx.lineWidth = isSelected ? 3 : 2;
+    } else if (node.role === 'Crashed') {
+      ctx.fillStyle = '#180d0e';
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+    } else {
+      // Follower
+      ctx.fillStyle = '#0d0e11';
+      ctx.strokeStyle = isSelected ? '#818cf8' : isHovered ? '#475569' : '#23252a';
+      ctx.lineWidth = isSelected ? 2.5 : 1.5;
+      ctx.setLineDash([]);
+    }
+
+    ctx.fill();
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 3. Selection Focus Ring
+    if (isSelected) {
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, nodeRadius + 8, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(94, 106, 210, 0.5)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // 4. Text labels inside node
+    drawNodeText(ctx, pos.x, pos.y, node);
+
+    ctx.restore();
+  }
+}
+
+function drawTimerRing(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  radius: number,
+  node: NodeSnapshot
+) {
+  const ringRadius = radius + 4;
+  const startAngle = -Math.PI / 2;
+
+  // Background ring track
+  ctx.beginPath();
