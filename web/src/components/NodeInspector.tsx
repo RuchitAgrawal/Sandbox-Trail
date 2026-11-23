@@ -98,3 +98,113 @@ export const NodeInspector: React.FC = () => {
             }`}
           >
             {node.role === 'Crashed' ? (
+              <>
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Restart Node</span>
+              </>
+            ) : (
+              <>
+                <Skull className="w-3.5 h-3.5" />
+                <span>Crash Node</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Client Write input form */}
+        <div className="bg-surface-2 p-3 rounded-md border border-hairline space-y-2">
+          <span className="text-xs font-mono text-ink-subtle block">Send Client Command:</span>
+          <form onSubmit={handleSendWrite} className="flex space-x-1.5">
+            <input
+              type="text"
+              value={commandInput}
+              onChange={(e) => setCommandInput(e.target.value)}
+              placeholder="e.g. SET x = 10"
+              className="flex-1 bg-surface-3 border border-hairline text-ink text-xs px-2.5 py-1.5 rounded-sm focus:outline-none focus:border-primary font-mono"
+            />
+            <button
+              type="submit"
+              className="px-2.5 py-1.5 bg-primary text-white rounded-sm hover:bg-primary-hover text-xs transition-colors flex items-center justify-center"
+            >
+              <Send className="w-3 h-3" />
+            </button>
+          </form>
+
+          {writeFeedback && (
+            <div className="text-[11px] font-mono text-amber-400 flex items-center space-x-1 mt-1">
+              <AlertCircle className="w-3 h-3 flex-shrink-0" />
+              <span>{writeFeedback}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Replicated Log Entries Table */}
+        <div className="bg-surface-2 rounded-md border border-hairline overflow-hidden">
+          <div className="px-3 py-2 border-b border-hairline flex items-center justify-between">
+            <span className="text-xs font-mono text-ink-subtle">
+              Replicated Log ({node.log_entries.length - 1} entries)
+            </span>
+          </div>
+
+          <div className="max-h-48 overflow-y-auto">
+            {node.log_entries.length <= 1 ? (
+              <div className="p-3 text-center text-xs font-mono text-ink-tertiary">
+                Log is empty (sentinel index 0)
+              </div>
+            ) : (
+              <table className="w-full text-left font-mono text-[11px]">
+                <thead className="bg-surface-3 text-ink-subtle border-b border-hairline">
+                  <tr>
+                    <th className="py-1 px-2.5">Idx</th>
+                    <th className="py-1 px-2">Term</th>
+                    <th className="py-1 px-2">Command</th>
+                    <th className="py-1 px-2.5 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-hairline">
+                  {node.log_entries.slice(1).map((entry) => {
+                    const isCommitted = entry.index <= node.commit_index;
+                    return (
+                      <tr key={entry.index} className="hover:bg-surface-3/50">
+                        <td className="py-1 px-2.5 text-ink-subtle">{entry.index}</td>
+                        <td className="py-1 px-2 text-ink-muted">T{entry.term}</td>
+                        <td className="py-1 px-2 text-ink truncate max-w-[90px]">
+                          {entry.command}
+                        </td>
+                        <td className="py-1 px-2.5 text-right">
+                          <span
+                            className={`px-1.5 py-0.2 rounded text-[9px] ${
+                              isCommitted
+                                ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-900/60'
+                                : 'bg-amber-950/60 text-amber-400 border border-amber-900/60'
+                            }`}
+                          >
+                            {isCommitted ? 'Commit' : 'Uncom'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        {/* Node Event Logs */}
+        <div className="bg-surface-2 rounded-md border border-hairline overflow-hidden">
+          <div className="px-3 py-1.5 border-b border-hairline">
+            <span className="text-xs font-mono text-ink-subtle">Recent Events</span>
+          </div>
+          <div className="p-2.5 max-h-36 overflow-y-auto space-y-1 font-mono text-[10px] text-ink-muted">
+            {node.node_log.slice(-15).map((log, i) => (
+              <div key={i} className="leading-tight text-ink-subtle hover:text-ink">
+                {log}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+};
