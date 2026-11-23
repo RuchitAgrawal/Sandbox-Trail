@@ -1,17 +1,40 @@
 import React from 'react';
-import { useSimStore } from './store/useSimStore';
+import { HeaderBar } from './components/HeaderBar';
+import { CanvasStage } from './components/CanvasStage';
+import { ChaosToolbar } from './components/ChaosToolbar';
+import { NodeInspector } from './components/NodeInspector';
+import { TimelineScrubber } from './components/TimelineScrubber';
+import { LinkPopover } from './components/LinkPopover';
+import { ScenarioModal } from './components/ScenarioModal';
 
-export default function App() {
-  const isRunning = useSimStore(state => state.isRunning);
+export const App: React.FC = () => {
   return (
-    <div className="min-h-screen bg-[#0c0d0e] text-slate-100 flex flex-col font-sans select-none">
-      <header className="h-14 border-b border-white/5 flex items-center px-4 justify-between">
-        <div className="flex items-center gap-3">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <h1 className="text-sm font-semibold tracking-wide">Chaos Raft Sandbox</h1>
-        </div>
-      </header>
-      <main className="flex-1 relative overflow-hidden bg-dot-pattern" />
+    <div className="flex flex-col h-screen w-screen bg-canvas text-ink overflow-hidden select-none font-sans">
+      {/* Top Header Bar */}
+      <HeaderBar />
+
+      {/* Main Interactive Stage */}
+      <div className="flex-1 relative flex overflow-hidden">
+        {/* Central Canvas2D Visualizer */}
+        <CanvasStage />
+
+        {/* Floating Chaos Toolbar (Pointer, Scissor, Crash, Write) */}
+        <ChaosToolbar />
+
+        {/* Floating Link Latency / Partition Configuration Popover */}
+        <LinkPopover />
+
+        {/* Guided Scenario Step-by-Step Overlay */}
+        <ScenarioModal />
+
+        {/* Right Drawer: Node Replicated Log & State Inspector */}
+        <NodeInspector />
+      </div>
+
+      {/* Bottom Time-Travel Scrubber & Action Replay Bar */}
+      <TimelineScrubber />
     </div>
   );
-}
+};
+
+export default App;
